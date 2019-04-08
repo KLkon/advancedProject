@@ -1,0 +1,45 @@
+Rabbit
+Win:Rabbit 安装包 安装完成 RabbitMQ Server install 安装MQ服务， net Start RabbitMQ 启动服务， 默认本地地址127.0.0.1:15672	guest/guest 默认账户密码  Admin 123456 
+	Erlang 安装包
+	
+Exchange:direct: point to point
+		topic: publisher subscribe	
+		Fanout:multicast
+		
+		
+1、SpringBoot: 		配置
+//将 连接工厂类、监听容器工厂类 注入Spring
+@Configuration
+public class ConsumerConfig {
+ 
+    @Bean
+    public ConnectionFactory connectionFactory(){
+        CachingConnectionFactory factory = new CachingConnectionFactory();
+        factory.setUri("amqp://zhihao.miao:123456@192.168.1.131:5672");
+        return factory;
+    }
+ 
+    @Bean
+    public RabbitListenerContainerFactory<?> rabbitListenerContainerFactory(ConnectionFactory connectionFactory){
+        //SimpleRabbitListenerContainerFactory发现消息中有content_type有text就会默认将其转换成string类型的
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        return factory;
+    }
+ 
+}
+2、Spring:配置
+//直接在配置文件中配置  连接工厂类、监听容器工厂类
+<!--连接-->
+  <rabbit:connection-factory id="connectionFactory" virtual-host="${rmq.virtualhost}" host="${rmq.ip}" username="${rmq.manager.user}"
+                             password="${rmq.manager.password}" />
+<!--Rabbit监听类-->
+  <bean id="rabbitListenerContainerFactory" class="org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory">
+    <property name="connectionFactory" ref="connectionFactory"/>
+  </bean>
+  <!--开启RabbitMQ注解-->
+  <rabbit:annotation-driven />
+
+																		= "{11,22}"
+之后 完成1或者2， 即可在 消费者类的  1、目标方法上@RabbitListener(queues = "队列名称")
+									2、类上	@RabbitListener(queues = "队列名称") 目标方法上@RabbitHandler

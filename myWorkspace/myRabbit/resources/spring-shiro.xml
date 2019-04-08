@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:aop="http://www.springframework.org/schema/aop"
+  xsi:schemaLocation="http://www.springframework.org/schema/beans 
+          http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+          http://www.springframework.org/schema/aop
+          http://www.springframework.org/schema/aop/spring-aop-4.2.xsd">
+  <description>Shiro安全配置</description>
+  
+  <bean id="shiroCacheManager" class="org.apache.shiro.cache.ehcache.EhCacheManager">
+    <property name="cacheManager" ref="ehcacheManager"></property>
+  </bean>
+  
+  <bean id="passwordMatcher" class="com.hb.epca.web.shiro.RetryLimitCredentialsMatcher">
+    <constructor-arg ref="shiroCacheManager"/>
+    <property name="hashAlgorithmName" value="SHA-256" />
+    <property name="hashIterations" value="2" />
+    <property name="storedCredentialsHexEncoded" value="true" />
+  </bean>
+  <bean id="shiroRealm" class="com.hb.epca.web.shiro.ShiroRealm">
+    <property name="credentialsMatcher" ref="passwordMatcher" />
+  </bean>
+
+  <bean id="sessionIdCookie" class="org.apache.shiro.web.servlet.SimpleCookie">
+    <property name="name" value="_EPCA_JSESSIONID_" />
+  </bean>
+  <bean id="sessionDAO" class="org.apache.shiro.session.mgt.eis.EnterpriseCacheSessionDAO">
+    <property name="cacheManager" ref="shiroCacheManager" />
+  </bean>
+  
+  <bean id="sessionManager" class="org.apache.shiro.web.session.mgt.DefaultWebSessionManager">
+    <property name="globalSessionTimeout" value="3600000" />
+    <property name="sessionDAO" ref="sessionDAO"/>  
+    <property name="sessionIdCookieEnabled" value="true"/>  
+    <property name="sessionIdCookie" ref="sessionIdCookie"/> 
+    <property name="sessionIdUrlRewritingEnabled" value="false"/>
+    <!-- 
+    <property name="deleteInvalidSessions" value="true"/>  
+    <property name="sessionValidationSchedulerEnabled" value="true"/>  
+    <property name="sessionValidationScheduler" ref="sessionValidationScheduler"/>  
+     -->
+  </bean>
+  <bean id="sessionValidationScheduler" class="org.apache.shiro.session.mgt.ExecutorServiceSessionValidationScheduler">
+    <property name="interval" value="1800000"/>
+    <property name="sessionManager" ref="sessionManager" />
+  </bean>
+
+  <bean id="rememberMeCookie" class="org.apache.shiro.web.servlet.SimpleCookie">
+    <constructor-arg value="rememberMe" />
+    <property name="httpOnly" value="true" />
+    <property name="maxAge" value="#{7 * 24 * 60 * 60}"/>
+  </bean>
+  <bean id="rememberMeManager" class="org.apache.shiro.web.mgt.CookieRememberMeManager">
+    <!-- <property name="cipherKey" value="#{T(org.apache.shiro.codec.Base64).decode('5b635Yuk5oiQ6ZW/5a2m6Q==')}"></property> -->
+    <property name="cookie" ref="rememberMeCookie" />
+  </bean>
+
+  <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+    <property name="realm" ref="shiroRealm" />
+    <property name="cacheManager" ref="shiroCacheManager" />
+    <property name="sessionManager" ref="sessionManager" />
+    <!-- <property name="rememberMeManager" ref="rememberMeManager" /> -->
+  </bean>
+
+  <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+    <property name="securityManager" ref="securityManager" />
+    <property name="loginUrl" value="/login.html" />
+    <property name="unauthorizedUrl" value="/503.html" />
+    <property name="filterChainDefinitions">
+      <value>
+        /favicon.ico = anon
+        /default/** = anon
+        /login = anon
+        /** = anon
+        <!--  /** = authc -->
+        <!-- /admin/listUser**=authc,perms[agent:manage] -->
+      </value>
+    </property>
+  </bean>
+  <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor" />
+
+  <aop:config proxy-target-class="true" />
+  <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+    <property name="securityManager" ref="securityManager" />
+  </bean>
+
+</beans>

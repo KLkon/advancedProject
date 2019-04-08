@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+  xmlns:context="http://www.springframework.org/schema/context" xmlns:task="http://www.springframework.org/schema/task"
+       xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+
+  xsi:schemaLocation="
+      http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+      http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd
+      http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+      http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+      http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.3.xsd
+http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit-1.6.xsd">
+
+  <bean id="druidConfig" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+    <property name="locations">
+      <list>
+        <!--数据库配置-->
+        <value>classpath:/druid.properties</value>
+        <!--redis 配置-->
+        <value>classpath:myredis.properties</value>
+        <!--RabbitMQ配置-->
+        <value>classpath:myrabbitMQ.properties</value>
+      </list>
+    </property>
+  </bean>
+
+  <bean id="propertyConfigurer" class="com.hb.epca.conf.PropertyConfigurer">
+    <property name="ignoreUnresolvablePlaceholders" value="true" />
+    <property name="ignoreResourceNotFound" value="true" />
+    <property name="locations">
+      <list>
+        <value>classpath:configurations.properties</value>
+        <!--外网内网配置-->
+        <value>classpath:allowOrigin.properties</value>
+      </list>
+    </property>
+  </bean>
+  
+  
+  <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+    <property name="driverClassName" value="${driverClassName}"></property>
+    <property name="url" value="${url}"></property>
+    <property name="username" value="${username}"></property>
+    <property name="password" value="${password}"></property>
+    <property name="connectionProperties" value="${connectionProperties}" />
+    <property name="filters" value="config,mergeStat,wall" />
+    <property name="initialSize" value="${initialSize}" />
+    <property name="minIdle" value="${minIdle}" />
+    <property name="maxActive" value="${maxActive}" />
+    <property name="maxWait" value="${maxWait}" />
+    <property name="timeBetweenEvictionRunsMillis" value="60000" />
+    <property name="minEvictableIdleTimeMillis" value="300000" />
+    <property name="testWhileIdle" value="true" />
+    <property name="testOnBorrow" value="false" />
+    <property name="testOnReturn" value="false" />
+    <property name="logAbandoned" value="true" />
+  </bean>
+
+  <!-- Redis 连接池配置 -->
+  <bean id="jedisPool" class="redis.clients.jedis.JedisPool" destroy-method="close">
+    <constructor-arg name="host" value="${redis.host}" />
+    <constructor-arg name="port" value="${redis.port}" />
+  </bean>
+  <!--导入RabbitMQ 配置文件-->
+  <import resource="classpath:spring-rabbitmq.xml"/>
+
+
+  <bean id="dynamicDataSource" class="com.hb.epca.core.datasource.DynamicDataSourceFactory" init-method="init" /> 
+
+  <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    <property name="dataSource" ref="dynamicDataSource" />
+    <property name="mapperLocations">
+      <array>
+        <value>classpath:mapper/**/**-mapper.xml</value>
+        <value>classpath:mapper/**-mapper.xml</value>
+      </array>
+    </property>
+    <property name="typeAliasesPackage" value="com.hb.epca.model" />
+    <property name="plugins">
+      <array>
+   	    <bean class="com.github.pagehelper.PageInterceptor">
+          <property name="properties">
+            <value>
+                reasonable=true
+                pageSizeZero=true
+                params=count=countSql
+                autoRuntimeDialect=true
+                rowBoundsWithCount=true
+            </value>
+          </property>
+        </bean>
+      </array>
+    </property>
+  </bean>
+
+  <!-- scan for mappers and let them be autowired -->
+  <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+    <property name="basePackage" value="com.hb.epca.core.mapper" />
+  </bean>
+
+    <!-- enable Aspectj -->
+    <!--<aop:aspectj-autoproxy />-->
+
+
+  <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dynamicDataSource" />
+  </bean>
+  <bean id="transactionTemplate" class="org.springframework.transaction.support.TransactionTemplate">
+    <property name="transactionManager" ref="transactionManager" />
+  </bean>
+  <tx:annotation-driven transaction-manager="transactionManager" /> <!-- 支持注解事务 -->
+
+  <!-- 使Spring支持自动检测组件 -->
+  <context:component-scan base-package="com.hb.epca.core.datasource, com.hb.epca.service, com.hb.epca.web " use-default-filters="false">
+    <context:include-filter type="annotation" expression="org.springframework.stereotype.Service" />
+    <context:include-filter type="annotation" expression="org.springframework.stereotype.Component" />
+    <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+  </context:component-scan>
+  <!-- 30M限制 -->
+
+  <bean class="org.springframework.web.multipart.commons.CommonsMultipartResolver" id="multipartResolver">
+	<property name="maxUploadSize" value="31457280"/>
+	<property name="defaultEncoding" value="utf-8"/>
+  </bean>
+  
+  <task:annotation-driven/>
+  <!--工作 任务状态-->
+  <bean class="com.hb.epca.util.UpdateTaskStatus" id="updateTaskStatus"/>
+  <!--在线超标-->
+  <bean class="com.hb.epca.service.process.impl.ProcessOnlinePreposeServiceImpl" id="onlinePreposeProcess"/>
+  <!--常规监测-->
+  <bean class="com.hb.epca.service.task.impl.RoutineMonitoringTask" id="routineMonitoring"/>
+  <!--短信-->
+  <bean class="com.hb.epca.service.message.Tips" id="tips"/>
+  <!--节假日相关-->
+  <bean class="com.hb.epca.util.Holiday" id="holiday"></bean>
+   
+  <task:scheduled-tasks>
+      <!--每年12月1日创建下一年节日表-->
+      <task:scheduled ref="holiday" method="getOneYearWorkDay" cron="0 0 0 1 12 ?" />
+      <!--监测任务结论（排序使用） 每天0点0分0秒触发任务 -->
+      <task:scheduled ref="processTaskListServiceImpl" cron="0 0 0 * * ?" method="updateJCTaskResult" />
+      <!-- 这里表示的是每隔3分钟执行一次 -->
+      <task:scheduled ref="updateTaskStatus" cron="0 */3 * * * ?" method="updateTaskStatus"/>
+      <task:scheduled ref="updateTaskStatus" cron="0 */3 * * * ?" method="InsertWorkNode"/>
+      <task:scheduled ref="updateTaskStatus" cron="0 */3 * * * ?" method="InsertRandomEvaluatingWorkNode"/>
+      <task:scheduled ref="onlinePreposeProcess" cron="0 */3 * * * ?" method="onlineProcess" />
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 * ?" method="launchMonthTask" />-->
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 1 ?" method="launchQuarterTask" />-->
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 4 ?" method="launchQuarterTask" />-->
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 7 ?" method="launchQuarterTask" />-->
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 10 ?" method="launchQuarterTask" />-->
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 1 ?" method="launchHalfYearTask" />-->
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 7 ?" method="launchHalfYearTask" />-->
+      <!--<task:scheduled ref="routineMonitoring" cron="0 0 0 1 1 ?" method="launchYearTask" />-->
+      <!--短信提示-->
+      <task:scheduled ref="tips" cron="0 0 10 * * ?" method="JobTips" />
+      <task:scheduled ref="tips" cron="0 0 10 * * ?" method="TaskTips" />
+      <!-- 每天11点10分30秒触发任务 -->
+      <!-- <task:scheduled ref="onlinePreposeProcess" cron="30 10 11 * * ?" method="onlineProcess" /> -->
+  </task:scheduled-tasks>
+  
+  <import resource="classpath:spring-cache.xml" />
+  <import resource="classpath:spring-shiro.xml" />
+</beans>

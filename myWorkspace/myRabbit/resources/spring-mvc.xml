@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:context="http://www.springframework.org/schema/context" xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+  xsi:schemaLocation="
+    http://www.springframework.org/schema/mvc 
+    http://www.springframework.org/schema/mvc/spring-mvc-4.2.xsd
+    http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans-4.2.xsd 
+	http://www.springframework.org/schema/context 
+    http://www.springframework.org/schema/context/spring-context-4.2.xsd
+    http://www.springframework.org/schema/aop
+    http://www.springframework.org/schema/aop/spring-aop-4.3.xsd">
+
+  <mvc:default-servlet-handler />
+
+  <mvc:cors>  
+    <mvc:mapping path="/**" allowed-origins="*" allow-credentials="true" max-age="3600" allowed-methods="POST,GET,OPTIONS"/>  
+  </mvc:cors>
+
+  <!-- 使Spring支持自动检测组件，如注解的Controller -->
+  <context:component-scan base-package="com.hb.epca.web.controller" use-default-filters="false">
+    <context:include-filter type="annotation" expression="org.springframework.stereotype.Controller" />
+    <context:exclude-filter type="annotation" expression="org.springframework.stereotype.Service" />
+  </context:component-scan>
+
+  
+
+  <bean id="formattingConversionService" class="org.springframework.format.support.FormattingConversionServiceFactoryBean" />
+  <mvc:annotation-driven conversion-service="formattingConversionService">
+    <mvc:message-converters register-defaults="false">
+      <bean class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter">
+        <property name="supportedMediaTypes">
+          <list>
+            <value>text/html;charset=UTF-8</value>
+            <value>application/json;charset=UTF-8</value>
+            <value>application/*+json;charset=UTF-8</value>
+          </list>
+        </property>
+      </bean>
+    </mvc:message-converters>
+  </mvc:annotation-driven>
+
+  <!-- 注册验证器 -->
+  <mvc:annotation-driven validator="validator" />
+  <bean id="validator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean">
+    <property name="providerClass" value="org.hibernate.validator.HibernateValidator" />
+    <property name="validationMessageSource" ref="messageSource" />
+  </bean>
+
+
+  <!-- 静态资源访问 -->
+  <mvc:resources location="/default/html/" mapping="/default/html/**" />
+  <mvc:resources location="/default/js/" mapping="/default/js/**" />
+  <mvc:resources location="/default/css/" mapping="/default/css/**" />
+  <mvc:resources location="/default/images/" mapping="/default/images/**" />
+
+  <bean id="logAspect" class="com.hb.epca.audit.AuditAspect"></bean>
+  <!-- enable Aspectj -->
+  <aop:aspectj-autoproxy proxy-target-class="true"/>
+
+
+  <!-- 拦截器 
+  <mvc:interceptors>
+    <mvc:interceptor>
+      <mvc:mapping path="/**" />
+      <bean class="com.hb.epca.web.interceptor.SessionInterceptor"></bean>
+    </mvc:interceptor>
+  </mvc:interceptors>
+-->
+  <!-- <mvc:interceptors>
+    <mvc:interceptor>
+      <mvc:mapping path="/**" />
+      <mvc:exclude-mapping path="/Admin/login"/>
+      <bean class="com.hb.epca.web.interceptor.TokenInterceptor"></bean>
+    </mvc:interceptor>
+  </mvc:interceptors> -->
+  <!--单用户登陆-->
+  <!--<mvc:interceptors>-->
+    <!--<mvc:interceptor>-->
+      <!--<mvc:mapping path="/**" />-->
+      <!--<mvc:exclude-mapping path="/TdNews/queryIsEnable" />-->
+      <!--<mvc:exclude-mapping path="/" />-->
+      <!--<mvc:exclude-mapping path="/FileUpDownUtils/fileupLoad" />-->
+      <!--<bean class="com.hb.epca.web.interceptor.SensitiveParamInterceptor"></bean>-->
+    <!--</mvc:interceptor>-->
+    <!--<mvc:interceptor>-->
+      <!--<mvc:mapping path="/**" />-->
+      <!--<mvc:exclude-mapping path="/TdNews/queryIsEnable" />-->
+      <!--<mvc:exclude-mapping path="/" />-->
+      <!--<mvc:exclude-mapping path="/FileUpDownUtils/fileupLoad" />-->
+      <!--<bean class="com.hb.epca.web.interceptor.SingleUserInterceptor"></bean>-->
+    <!--</mvc:interceptor>-->
+  <!--</mvc:interceptors>-->
+</beans>
